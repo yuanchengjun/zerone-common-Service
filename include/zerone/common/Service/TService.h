@@ -14,29 +14,33 @@
 namespace zerone {
 namespace common {
 
-template<class IS, class OS>
+template<class ISTREAM, class OSTREAM>
 class TService {
+public:
+	using IoFunction = ::std::function<void(ISTREAM &, OSTREAM &)>;
+	using IoFunctionMap = ::std::map<::std::string, IoFunction>;
+
 private:
-	::std::map<::std::string, ::std::function<void(IS &, OS &)> > mIOFunctionMap;
+	IoFunctionMap mIoFunctionMap;
 
 public:
 	template<class I, class C, class R, class ... P>
 	void bind(const ::std::string & name, R (I::*function)(P ...), C & object) {
-		mIOFunctionMap[name] =
-				[this, function, & object](IS & is, OS & os) {
-					using params_tuple = ::std::tuple<typename ::std::remove_const<typename ::std::remove_reference<P>::type>::type ...>;
-					using params_reader = ::zerone::common::TServiceTupleReader<::std::tuple_size<params_tuple>::value>;
-					using invoker = ::zerone::common::TServiceFunctionInvoker<::std::tuple_size<params_tuple>::value>;
-					params_tuple params;
-					params_reader::read(is, params);
-					os << invoker::invoke(function, object, params);
+		mIoFunctionMap[name] =
+				[this, function, & object](ISTREAM & is, OSTREAM & os) {
+					using ParamsTuple = ::std::tuple<typename ::std::remove_const<typename ::std::remove_reference<P>::type>::type ...>;
+					using ParamsReader = ::zerone::common::TServiceTupleReader<::std::tuple_size<ParamsTuple>::value>;
+					using Invoker = ::zerone::common::TServiceFunctionInvoker<::std::tuple_size<ParamsTuple>::value>;
+					ParamsTuple params;
+					ParamsReader::read(is, params);
+					os << Invoker::invoke(function, object, params);
 				};
 	}
 
-	void run(IS & is, OS & os) {
+	void run(ISTREAM & is, OSTREAM & os) {
 		::std::string cmd;
 		is >> cmd;
-		mIOFunctionMap[cmd](is, os);
+		mIoFunctionMap[cmd](is, os);
 	}
 };
 
